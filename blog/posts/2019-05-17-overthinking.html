@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Reflections - The Perils of Overthinking</title>
+        <link rel="stylesheet" href="../css/default.css">
+        <link rel="stylesheet" href="../css/source.css">
+        <link rel="shortcut icon" href="../favicon.png">
+    </head>
+    <body>
+        <header>
+            <div class="logo">
+                <a href="../">Reflections</a>
+            </div>
+            <nav>
+                <a href="../">Home</a>
+                <a href="../about.html">About</a>
+                <a href="../contact.html">Contact</a>
+                <a href="../archive.html">Archive</a>
+            </nav>
+        </header>
+
+        <main role="main">
+            <h1>The Perils of Overthinking</h1>
+            <section class="header">
+  Posted on May 17, 2019
+  
+</section>
+<section class="time">
+  Approximate read time: 4.0 mins, 56 secs
+</section>
+<section class="tags">
+  
+    Tags: <a href="../tags/haskell.html">haskell</a>, <a href="../tags/software%20complexity.html">software complexity</a>, <a href="../tags/anecdote.html">anecdote</a>, <a href="../tags/lazyboy.html">lazyboy</a>
+  
+</section>
+<article>
+  <section>
+      <p>I was working on <em>Lazyboy</em>, my embedded domain specific language for Game Boy development, when I happened across a scenario wherein I wanted to express “symmetry” in typeclass instances.</p>
+<p>For context, I was implementing an abstraction for conditional logic, with a syntax as follows:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb1-1" title="1">cond (<span class="dt">A</span> <span class="fu">==</span> <span class="dv">5</span>) <span class="fu">$</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb1-2" title="2">    write (<span class="dt">Address</span> vram) <span class="bn">0xFF</span></a></code></pre></div>
+<p>It’s not essential to completely understand what’s happening here, only that it’s a representation of conditional execution.</p>
+<p>This code produces the following assembly:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode asm"><code class="sourceCode fasm"><a class="sourceLine" id="cb2-1" title="1">cp A, <span class="dv">5</span></a>
+<a class="sourceLine" id="cb2-2" title="2">jr nz, .L1</a>
+<a class="sourceLine" id="cb2-3" title="3">ld HL<span class="bn">, $8000</span></a>
+<a class="sourceLine" id="cb2-4" title="4">ld [HL], <span class="dv">255</span></a>
+<a class="sourceLine" id="cb2-5" title="5"><span class="fu">.L1:</span></a></code></pre></div>
+<p>The type of <code>cond</code> is <code>cond :: Lazyboy Condition -&gt; Lazyboy () -&gt; Lazyboy ()</code>, which for practical purposes means that the condition provided to the function executes a series of instructions and returns which <em>CPU Condition Flag</em> should be checked, with a jump occurring on the flag accordingly.</p>
+<p>It’s desirable to provide an abstraction to compare the values contained in registers to immediate values as well as to other registers with the same syntax, so in order to achieve this, a typeclass was my first consideration, since the implementation is dependent on which types are being compared.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb3-1" title="1"><span class="kw">class</span> <span class="dt">Comparable</span> a <span class="kw">where</span></a>
+<a class="sourceLine" id="cb3-2" title="2"><span class="ot">    equalTo ::</span> a <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> <span class="dt">Lazyboy</span> <span class="dt">Condition</span></a></code></pre></div>
+<p>But hang on — we’re going to be comparing things of different types, and the actual implementation of <code>equalTo</code> (and other such comparisons) is dependent on the type of the arguments. So we need a typeclass that takes <em>two</em> arguments.</p>
+<p>Checking the <a href="https://wiki.haskell.org/Multi-parameter_type_class">Haskell Wiki</a> we find that what we want is the MultiParamTypeClasses extension. Awesome. Confirming our philosophy, the wiki notes that single-parameter typeclasses can be considered a “set of types”, while multi-parameter ones can be thought of as “relations between types”, and that’s exactly what we’re doing here.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb4-1" title="1"><span class="ot">{-# LANGUAGE MultiParamTypeClasses #-}</span></a>
+<a class="sourceLine" id="cb4-2" title="2"></a>
+<a class="sourceLine" id="cb4-3" title="3"><span class="kw">class</span> <span class="dt">Comparable</span> a b <span class="kw">where</span></a>
+<a class="sourceLine" id="cb4-4" title="4"><span class="ot">    equalTo ::</span> a <span class="ot">-&gt;</span> b <span class="ot">-&gt;</span> <span class="dt">Lazyboy</span> <span class="dt">Condition</span></a></code></pre></div>
+<p>Let’s try it out and write an instance for comparing 8-bit registers and immediate unsigned bytes. This isn’t how the compiler <em>exactly</em> handles all comparisons, because it has a few optimizations (mostly redundancy checking), but it makes explanation easier.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb5-1" title="1"><span class="kw">instance</span> <span class="dt">Comparable</span> <span class="dt">Register8</span> <span class="dt">Word8</span> <span class="kw">where</span></a>
+<a class="sourceLine" id="cb5-2" title="2">    equalTo a b <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb5-3" title="3">        tell [<span class="dt">LDrr</span> <span class="dt">A</span> a, <span class="dt">CPn</span> b]</a>
+<a class="sourceLine" id="cb5-4" title="4">        <span class="fu">return</span> <span class="dt">Zero</span></a></code></pre></div>
+<p>That was straightforward, and testing it out shows that it works. But what if we swap the argument order? Well, GHC tells us:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode default"><code class="sourceCode default"><a class="sourceLine" id="cb6-1" title="1">• No instance for (Comparable Word8 Register8)</a>
+<a class="sourceLine" id="cb6-2" title="2">    arising from a use of ‘equalTo’</a></code></pre></div>
+<p>RIP. But the definition for this missing instance is trivial — it’s merely the one just defined, only with its arguments flipped. What gives? Is there a way to specify we’d like flipped versions of multi-parameter typeclasses by default? Is there a way to make the typeclass do this automatically?</p>
+<p>Out of curiousity, and a craving to avoid repeating code for the purpose of declaring the flipped counterpart instance, I started looking at language extensions. The first that I came across was <code>{-# LANGUAGE FunctionalDependencies #-}</code>, which allows type deduction of a type from a set of one or more other types. This sounded relatively applicable (no pun intended) insofar as we’re always going to return the same type, but the second type parameter can be deduced from the first. Or so I thought, since a new problem arises in that a first argument of <code>Register8</code> could ambiguously indicate a second argument of another <code>Register8</code> or a <code>Word8</code>. Unable to get anything meaningful happening, I took it back to the drawing board.</p>
+<p>I did some further digging, and came across mentions of using <code>{-# LANGUAGE FlexibleInstances #-}</code> coupled with extensions for allowing undecidability, but I admittedly have too naïve an understanding to grasp what’s going on there, so at that point I thought that there must be a simpler way. It can’t be <em>that</em> obscure a circumstance, and I don’t profess to be an expert at Haskell, but I’d rather write code that is as understandable by others, and by newcomers, as possible — not to mention that an overuse of extensions surely doesn’t help with portability.</p>
+<p>So what did I end up going with in the end?</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb7-1" title="1"><span class="kw">instance</span> <span class="dt">Comparable</span> <span class="dt">Word8</span> <span class="dt">Register8</span> <span class="kw">where</span></a>
+<a class="sourceLine" id="cb7-2" title="2">  equalTo <span class="fu">=</span> <span class="fu">flip</span> equalTo</a></code></pre></div>
+<p>Of course, it requires redeclaring each function which belongs to the typeclass, where a more “elegant” solution may not, but it’s much less of an eyesore than I thought it’d be, and is trivial to understand, even if it feels just a <em>little</em> redundant.</p>
+<p>My takeaway from this is that Haskell’s ecosystem and especially its extensions are a vast world that grant you immeasurable power and expression, but it’s easy to get lost in that world if you’re not familiar with it, and sometimes there’s nothing wrong with what first comes to mind.</p>
+<p>Oh, and if you happen to think up an elegant way of avoiding the use of <code>MultiParamTypeClasses</code> too, then feel free to get in touch.</p>
+<p><em>Lazyboy is an embedded domain-specific language for programming the Nintendo Game Boy in Haskell. You can follow its development <a href="https://github.com/ix/lazyboy">on GitHub</a>.</em></p>
+  </section>
+</article>
+
+        </main>
+    </body>
+</html>
