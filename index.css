@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css?family=Lato:400&display=swap');
 
 :root {
-    --background-light: #efefef;
+    --background-light: #f9f9f9;
     --plain-text-light: #444444;
     --feature-light:    #e95474;
 }
@@ -24,6 +24,7 @@ body {
     display: grid;
     font-family: "Oxygen", "Droid Sans", sans-serif;
     color: var(--plain-text-light);
+    background: var(--background-light);
 }
 
 header h1 {
