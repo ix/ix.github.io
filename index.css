@@ -11,13 +11,13 @@
 @media only screen and (min-width: 700px) {
     body { margin: 5rem 15rem 5rem 15rem; }
     header h1 { margin: 1rem 0 1rem 0; }
-    article p { margin: 0rem 0 1rem 0; }
+    main p { margin: 0rem 0 1rem 0; }
 }
 
 @media only screen and (max-width: 700px) {
     body { margin: 1rem 3rem 1rem 3rem; }
     header h1 { margin: 1rem 0 1rem 0; }
-    article p { margin: 0rem 0 1rem 0; }
+    main p { margin: 0rem 0 1rem 0; }
 }
 
 body {
@@ -39,11 +39,11 @@ header h1:after {
     margin: 0 0 0 1.2rem;
 }
 
-article p {
+main p {
     font-size: 1.5em;
 }
 
-article a {
+main a {
     color: var(--feature-light);
 }
 
