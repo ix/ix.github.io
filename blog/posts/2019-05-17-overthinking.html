@@ -1,46 +1,35 @@
 <!doctype html>
-<html lang="en">
+<html>
     <head>
         <meta charset="utf-8">
-        <meta http-equiv="x-ua-compatible" content="ie=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Reflections - The Perils of Overthinking</title>
-        <link rel="stylesheet" href="../css/default.css">
-        <link rel="stylesheet" href="../css/source.css">
-        <link rel="shortcut icon" href="../favicon.png">
+        <title>🌹 || The Perils of Overthinking</title>
+        <link rel="stylesheet" href="../css/default.css" />
+        <link rel="stylesheet" href="../css/source.css" />
     </head>
     <body>
         <header>
-            <div class="logo">
-                <a href="../">Reflections</a>
-            </div>
-            <nav>
-                <a href="../">Home</a>
-                <a href="../about.html">About</a>
-                <a href="../contact.html">Contact</a>
-                <a href="../archive.html">Archive</a>
+            <nav class="b">
+                <a href="../">home</a>
+                <a href="https://empty.town">about &amp; contact</a>
+                <a href="../archive.html">archive</a>
             </nav>
         </header>
 
-        <main role="main">
-            <h1>The Perils of Overthinking</h1>
-            <section class="header">
-  Posted on May 17, 2019
-  
-</section>
-<section class="time">
-  Approximate read time: 5 mins
-</section>
-<section class="tags">
-  
-    Tags: <a href="../tags/haskell.html">haskell</a>, <a href="../tags/software%20complexity.html">software complexity</a>, <a href="../tags/anecdote.html">anecdote</a>, <a href="../tags/lazyboy.html">lazyboy</a>
-  
-</section>
-<article>
-  <section>
-      <p>I was working on <em>Lazyboy</em>, my embedded domain specific language for Game Boy development, when I happened across a scenario wherein I wanted to express “symmetry” in typeclass instances.</p>
+        <main>
+            <article>
+    <section class="header">
+        <span class="i" title="Posted at May 17, 2019">📅May 17, 2019</span>
+        
+    </section>
+    <section>
+      <span class="i" title="988 words long, approximately 4 mins 56 secs to read">📝988 words &mdash; ⏱4 mins 56 secs</span>
+    </section>
+    <section>
+        <h1 class="title">The Perils of Overthinking</h1>
+        <p>I was working on <em>Lazyboy</em>, my embedded domain specific language for Game Boy development, when I happened across a scenario wherein I wanted to express “symmetry” in typeclass instances.</p>
 <p>For context, I was implementing an abstraction for conditional logic, with a syntax as follows:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb1-1" title="1">cond (<span class="dt">A</span> <span class="fu">==</span> <span class="dv">5</span>) <span class="fu">$</span> <span class="kw">do</span></a>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb1-1" title="1">cond (<span class="dt">A</span> <span class="op">==</span> <span class="dv">5</span>) <span class="op">$</span> <span class="kw">do</span></a>
 <a class="sourceLine" id="cb1-2" title="2">    write (<span class="dt">Address</span> vram) <span class="bn">0xFF</span></a></code></pre></div>
 <p>It’s not essential to completely understand what’s happening here, only that it’s a representation of conditional execution.</p>
 <p>This code produces the following assembly:</p>
@@ -61,7 +50,7 @@
 <a class="sourceLine" id="cb4-4" title="4"><span class="ot">    equalTo ::</span> a <span class="ot">-&gt;</span> b <span class="ot">-&gt;</span> <span class="dt">Lazyboy</span> <span class="dt">Condition</span></a></code></pre></div>
 <p>Let’s try it out and write an instance for comparing 8-bit registers and immediate unsigned bytes. This isn’t how the compiler <em>exactly</em> handles all comparisons, because it has a few optimizations (mostly redundancy checking), but it makes explanation easier.</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb5-1" title="1"><span class="kw">instance</span> <span class="dt">Comparable</span> <span class="dt">Register8</span> <span class="dt">Word8</span> <span class="kw">where</span></a>
-<a class="sourceLine" id="cb5-2" title="2">    equalTo a b <span class="fu">=</span> <span class="kw">do</span></a>
+<a class="sourceLine" id="cb5-2" title="2">    equalTo a b <span class="ot">=</span> <span class="kw">do</span></a>
 <a class="sourceLine" id="cb5-3" title="3">        tell [<span class="dt">LDrr</span> <span class="dt">A</span> a, <span class="dt">CPn</span> b]</a>
 <a class="sourceLine" id="cb5-4" title="4">        <span class="fu">return</span> <span class="dt">Zero</span></a></code></pre></div>
 <p>That was straightforward, and testing it out shows that it works. But what if we swap the argument order? Well, GHC tells us:</p>
@@ -72,13 +61,13 @@
 <p>I did some further digging, and came across mentions of using <code>{-# LANGUAGE FlexibleInstances #-}</code> coupled with extensions for allowing undecidability, but I admittedly have too naïve an understanding to grasp what’s going on there, so at that point I thought that there must be a simpler way. It can’t be <em>that</em> obscure a circumstance, and I don’t profess to be an expert at Haskell, but I’d rather write code that is as understandable by others, and by newcomers, as possible — not to mention that an overuse of extensions surely doesn’t help with portability.</p>
 <p>So what did I end up going with in the end?</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb7-1" title="1"><span class="kw">instance</span> <span class="dt">Comparable</span> <span class="dt">Word8</span> <span class="dt">Register8</span> <span class="kw">where</span></a>
-<a class="sourceLine" id="cb7-2" title="2">  equalTo <span class="fu">=</span> <span class="fu">flip</span> equalTo</a></code></pre></div>
+<a class="sourceLine" id="cb7-2" title="2">  equalTo <span class="ot">=</span> <span class="fu">flip</span> equalTo</a></code></pre></div>
 <p>Of course, it requires redeclaring each function which belongs to the typeclass, where a more “elegant” solution may not, but it’s much less of an eyesore than I thought it’d be, and is trivial to understand, even if it feels just a <em>little</em> redundant.</p>
 <p>My takeaway from this is that Haskell’s ecosystem and especially its extensions are a vast world that grant you immeasurable power and expression, but it’s easy to get lost in that world if you’re not familiar with it, and sometimes there’s nothing wrong with what first comes to mind.</p>
 <p>Oh, and if you happen to think up an elegant way of avoiding the use of <code>MultiParamTypeClasses</code> too, then feel free to get in touch.</p>
 <p><em>Lazyboy is an embedded domain-specific language for programming the Nintendo Game Boy in Haskell. You can follow its development <a href="https://github.com/ix/lazyboy">on GitHub</a>.</em></p>
-  </section>
-</article>
+    </section>
+</article> 
 
         </main>
     </body>
